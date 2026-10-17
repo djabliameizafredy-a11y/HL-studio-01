@@ -1,5 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { toolDefinitions, executeTool } from "./tools";
+import { loadProjectMemory } from "./projectMemory";
+import { parseSkillCommand, loadSkill, listSkills } from "./skills";
+import { executeHooks } from "./hooks";
 
 let client: Anthropic | null = null;
 function getClient() {
@@ -31,26 +34,73 @@ const AGENT_SYSTEM_PROMPT = [
   "actions, pas dans le commentaire.",
 ].join(" ");
 
+import { getMcpTools, executeMcpTool, connectMcpServers, disconnectMcpServers } from "./mcpClient";
+
 export type AgentStep =
   | { type: "text"; content: string }
   | { type: "tool_use"; name: string; input: unknown }
   | { type: "tool_result"; name: string; output: string }
+  | { type: "pending_confirmation"; toolCallId: string; name: string; input: unknown }
   | { type: "done" }
   | { type: "error"; message: string };
 
-export async function* runAgent(task: string): AsyncGenerator<AgentStep> {
+export interface PendingConfirmation {
+  resolve: (approved: boolean) => void;
+  sessionId: string;
+  timeoutId: NodeJS.Timeout;
+}
+
+export const pendingConfirmations = new Map<string, PendingConfirmation>();
+
+/**
+ * Boucle d'agent interne — utilisable directement par le coordinateur
+ * de sous-agents parallèles (parallelAgents.ts). Accepte un system prompt
+ * custom pour permettre des rôles différents par sous-agent.
+ *
+ * @param task - La tâche à accomplir
+ * @param sessionId - L'identifiant de la session courante
+ * @param customSystemPrompt - System prompt à utiliser (si non fourni,
+ *   utilise AGENT_SYSTEM_PROMPT + mémoire projet HL.md)
+ */
+export async function* runSingleAgent(
+  task: string,
+  sessionId: string,
+  customSystemPrompt?: string
+): AsyncGenerator<AgentStep> {
   const anthropic = getClient();
+
+  // Construire le system prompt : custom OU défaut + mémoire projet
+  let systemPrompt: string;
+  if (customSystemPrompt) {
+    // Les sous-agents parallèles fournissent leur propre prompt
+    const projectRules = await loadProjectMemory();
+    systemPrompt = projectRules
+      ? `${customSystemPrompt}\n\n--- Règles du projet (HL.md) ---\n${projectRules}`
+      : customSystemPrompt;
+  } else {
+    const projectRules = await loadProjectMemory();
+    systemPrompt = projectRules
+      ? `${AGENT_SYSTEM_PROMPT}\n\n--- Règles du projet (HL.md) ---\n${projectRules}`
+      : AGENT_SYSTEM_PROMPT;
+  }
+
   const messages: Anthropic.MessageParam[] = [
     { role: "user", content: task },
   ];
 
   try {
+    // Injecter les outils MCP dynamiquement
+    const mcpTools = await getMcpTools();
+    const allTools = [...toolDefinitions, ...mcpTools];
+
     for (let step = 0; step < MAX_STEPS; step++) {
       const response = await anthropic.messages.create({
         model: AGENT_MODEL,
         max_tokens: 4096,
-        system: AGENT_SYSTEM_PROMPT,
-        tools: toolDefinitions,
+        system: systemPrompt,
+        tools: customSystemPrompt
+          ? allTools.filter(t => !["write_file", "run_command", "git_create_branch", "git_create_pr"].includes(t.name) && !t.name.startsWith("mcp__")) // Sous-agents n'ont pas le droit aux outils modifiants ni aux outils MCP externes par sécurité (lecture seule)
+          : allTools,
         messages,
       });
 
@@ -72,14 +122,58 @@ export async function* runAgent(task: string): AsyncGenerator<AgentStep> {
 
       const toolResults: Anthropic.ToolResultBlockParam[] = [];
       for (const toolUse of toolUseBlocks) {
-        yield { type: "tool_use", name: toolUse.name, input: toolUse.input };
-        const output = await executeTool(toolUse.name, toolUse.input);
-        yield { type: "tool_result", name: toolUse.name, output };
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: toolUse.id,
-          content: output,
-        });
+        // Exécution MCP ou interne
+        if (toolUse.name.startsWith("mcp__")) {
+          // MCP : On met en pause et on attend la confirmation utilisateur
+          yield { 
+            type: "pending_confirmation", 
+            toolCallId: toolUse.id, 
+            name: toolUse.name, 
+            input: toolUse.input 
+          };
+
+          const approved = await new Promise<boolean>((resolve) => {
+            const timeoutId = setTimeout(() => {
+              if (pendingConfirmations.has(toolUse.id)) {
+                pendingConfirmations.delete(toolUse.id);
+                resolve(false); // Refusé par timeout
+              }
+            }, 300_000); // 5 minutes
+
+            pendingConfirmations.set(toolUse.id, { resolve, sessionId, timeoutId });
+          });
+          
+          if (pendingConfirmations.has(toolUse.id)) {
+            clearTimeout(pendingConfirmations.get(toolUse.id)!.timeoutId);
+            pendingConfirmations.delete(toolUse.id);
+          }
+
+          if (!approved) {
+            const output = "⚠️ Outil non exécuté : L'utilisateur a refusé l'exécution de cet outil externe (ou le délai de 5 minutes a expiré).";
+            yield { type: "tool_result", name: toolUse.name, output };
+            toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: output });
+            continue;
+          }
+
+          yield { type: "tool_use", name: toolUse.name, input: toolUse.input };
+          const [, serverName, ...toolNameParts] = toolUse.name.split("__");
+          const realToolName = toolNameParts.join("__");
+          const output = await executeMcpTool(serverName, realToolName, toolUse.input);
+          
+          yield { type: "tool_result", name: toolUse.name, output };
+          toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: output });
+        } else {
+          // Outil interne classique
+          yield { type: "tool_use", name: toolUse.name, input: toolUse.input };
+          const output = await executeTool(toolUse.name, toolUse.input);
+          
+          yield { type: "tool_result", name: toolUse.name, output };
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: toolUse.id,
+            content: output,
+          });
+        }
       }
 
       messages.push({ role: "user", content: toolResults });
@@ -99,5 +193,63 @@ export async function* runAgent(task: string): AsyncGenerator<AgentStep> {
       type: "error",
       message: err instanceof Error ? err.message : "Erreur inconnue",
     };
+  }
+}
+
+/**
+ * Point d'entrée principal de l'agent — utilisé par /api/agent.
+ * Gère les skills (/commande), les hooks session_start/session_end,
+ * et délègue à runSingleAgent pour la boucle principale.
+ */
+export async function* runAgent(task: string, sessionId: string): AsyncGenerator<AgentStep> {
+  // Connexion MCP
+  await connectMcpServers();
+
+  // Hook session_start — erreur logguée, jamais bloquant
+  try {
+    const startResults = await executeHooks("session_start");
+    for (const r of startResults) {
+      if (!r.success) {
+        yield {
+          type: "text",
+          content: `⚠️ Hook session_start a échoué (${r.command}) : ${r.output}`,
+        };
+      }
+    }
+  } catch {
+    // Ne jamais bloquer le démarrage à cause d'un hook
+  }
+
+  try {
+    // Résolution des skills (/commande)
+    const skillCmd = parseSkillCommand(task);
+    let effectiveTask = task;
+    if (skillCmd) {
+      const skillContent = await loadSkill(skillCmd.commandName);
+      if (skillContent) {
+        effectiveTask = `Instructions de la skill "${skillCmd.commandName}":\n${skillContent}\n\nContexte utilisateur : ${skillCmd.args || "(aucun argument)"}`;
+      } else {
+        const available = await listSkills();
+        yield {
+          type: "text",
+          content: `⚠️ Skill "/${skillCmd.commandName}" introuvable. Skills disponibles : ${available.length > 0 ? available.map((s) => "/" + s).join(", ") : "(aucune)"}`,
+        };
+        yield { type: "done" };
+        return;
+      }
+    }
+
+    // Boucle principale
+    yield* runSingleAgent(effectiveTask, sessionId);
+  } finally {
+    // Déconnexion MCP
+    await disconnectMcpServers();
+
+    // Hook session_end — toujours exécuté, même en cas d'erreur
+    try {
+      await executeHooks("session_end");
+    } catch {
+      // Ne jamais faire planter la fin de session
+    }
   }
 }

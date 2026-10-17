@@ -75,19 +75,18 @@ bout en bout, dans l'esprit de Claude Code.
 
 ### ⚠️ Sécurité — à lire avant d'aller plus loin
 
-`run_command` exécute de vraies commandes shell sur la machine qui fait
-tourner le serveur. Les protections actuelles (chemin restreint au
-workspace, liste de motifs bloqués, timeout de 20s) sont un **filet
-minimal, pas une vraie sandbox** — une liste de blocage se contourne
-toujours.
+L'agent dispose de deux mécanismes qui exécutent du code arbitraire sur la machine qui fait tourner le serveur : 
+1. **`run_command`** : exécute de vraies commandes shell.
+2. **Hooks (`workspace/.hlstudio/hooks.json`)** : exécute des scripts à des moments clés (après l'écriture d'un fichier, avant une commande, en début/fin de session).
 
-- ✅ **OK pour prototyper en local**, sur ta machine, pour toi et ton
-  équipe
+Les protections actuelles (chemin restreint au workspace, liste de motifs bloqués, timeout) sont un **filet minimal, pas une vraie sandbox** — une liste de blocage se contourne toujours.
+
+- ✅ **OK pour prototyper en local**, sur ta machine, pour toi et ton équipe
 - ❌ **Ne jamais exposer `/api/agent` publiquement sans authentification**
-- ❌ **Ne pas déployer ce mode tel quel en Phase 7** (ouverture publique)
-  sans remplacer `run_command` par un vrai environnement isolé par
-  session — par exemple [E2B](https://e2b.dev) (sandbox cloud pensé pour
-  les agents IA), un conteneur Docker éphémère, ou une VM Firecracker
+- ❌ **Ne pas déployer ce mode tel quel en Phase 7** (ouverture publique) sans remplacer `run_command` et les hooks par un vrai environnement isolé par session (ex: [E2B](https://e2b.dev), un conteneur Docker éphémère, ou une VM Firecracker).
+
+> **Note sur le déploiement (Serverless / Multi-instances) :**  
+> Le mécanisme de confirmation humaine pour les outils MCP (Phase 6c) repose actuellement sur une structure de données en mémoire (`pendingConfirmations`). Si l'application est déployée sur un hébergement serverless (comme Vercel) ou multi-instances, ce mécanisme échouera (la requête de confirmation risque d'arriver sur une autre instance, ou la mémoire sera purgée). Pour la production, il faudra utiliser une base de données ou un cache distribué (Redis) pour gérer cet état.
 
 ### Tester le mode agent
 

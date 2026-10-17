@@ -5,22 +5,36 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Palette de départ pour Hight Light Studio — distincte des couleurs
-        // des autres apps du portfolio (Cusbuy=orange, FastCol=bleu, Beta
-        // Pay=violet, DevOnly=vert, Anipage=argent). À ajuster librement.
         studio: {
-          bg: "#12141C",
-          panel: "#1A1D29",
-          border: "#2A2E3E",
-          accent: "#22D3D8",
-          accentDark: "#0E9AA0",
-          text: "#E7E9F0",
-          muted: "#8A8FA3",
+          bg: "#FFFFFF",
+          bgAlt: "#F7F8F4",
+          panel: "#FFFFFF",
+          border: "#E5E7EB",
+          accent: "#0871E7",
+          accentDark: "#065CB8",
+          accentSecondary: "#0F9D58",
+          accentTertiary: "#D97706",
+          bgAccent: "#DEF0FC",
+          text: "#1A1A1A",
+          muted: "#6B7280",
         },
       },
       fontFamily: {
+        sans: ["var(--font-inter)", "sans-serif"],
+        display: ["var(--font-instrument)", "serif"],
         mono: ["var(--font-mono)", "monospace"],
       },
+      animation: {
+        'blob': 'blob 25s infinite',
+      },
+      keyframes: {
+        blob: {
+          '0%': { transform: 'translate(0px, 0px) scale(1) rotate(0deg)' },
+          '33%': { transform: 'translate(30px, -50px) scale(1.1) rotate(90deg)' },
+          '66%': { transform: 'translate(-20px, 20px) scale(0.9) rotate(180deg)' },
+          '100%': { transform: 'translate(0px, 0px) scale(1) rotate(360deg)' },
+        }
+      }
     },
   },
   plugins: [],

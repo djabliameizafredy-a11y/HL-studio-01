@@ -1,4 +1,4 @@
-export type ModelId = "claude" | "glm-5.2" | "gemma-4" | "nano-banana" | "wan" | "kimi";
+export type ModelId = "claude" | "glm-5.2" | "gemma-4" | "nano-banana" | "wan" | "kimi" | "kimi-k3" | "freellmapi" | "gemma-4-free" | "nemotron-free";
 
 export type WorkspaceMode = "chat" | "code" | "design" | "video";
 

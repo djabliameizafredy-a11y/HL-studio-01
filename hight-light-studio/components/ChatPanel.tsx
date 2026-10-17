@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import type { ChatMessage, WorkspaceMode } from "@/lib/types";
+import { useState, useEffect } from "react";
+import type { ChatMessage, WorkspaceMode, ModelId } from "@/lib/types";
 
 const MODE_LABELS: Record<WorkspaceMode, { title: string; placeholder: string }> = {
   chat: {
@@ -22,15 +22,40 @@ const MODE_LABELS: Record<WorkspaceMode, { title: string; placeholder: string }>
   },
 };
 
-export default function ChatPanel({ mode }: { mode: WorkspaceMode }) {
+export default function ChatPanel({ mode, model }: { mode: WorkspaceMode, model?: ModelId }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
   const { title, placeholder } = MODE_LABELS[mode];
+
+  useEffect(() => {
+    fetch(`/api/history?mode=${mode}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.conversationId) setConversationId(data.conversationId);
+        if (data.messages) {
+           const formattedMessages = data.messages.map((m: any) => ({
+             role: m.role,
+             content: m.content
+           }));
+           setMessages(formattedMessages);
+           
+           // Récupérer le média du dernier message assistant si présent
+           const lastMsg = data.messages[data.messages.length - 1];
+           if (lastMsg?.generated_media?.[0]) {
+             const media = lastMsg.generated_media[0];
+             if (media.media_type === "image") setImageUrl(media.media_url);
+             if (media.media_type === "video") setVideoUrl(media.media_url);
+           }
+        }
+      })
+      .catch(err => console.error("Erreur historique:", err));
+  }, [mode]);
 
   async function sendMessage() {
     if (!input.trim() || loading) return;
@@ -48,26 +73,75 @@ export default function ChatPanel({ mode }: { mode: WorkspaceMode }) {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages, mode }),
+        body: JSON.stringify({ messages: nextMessages, mode, model, conversationId }),
       });
-      const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error ?? "Erreur inconnue");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error ?? "Erreur inconnue");
+      }
 
-      setMessages([...nextMessages, { role: "assistant", content: data.text }]);
-      if (data.imageUrl) setImageUrl(data.imageUrl);
+      setMessages([...nextMessages, { role: "assistant", content: "" }]);
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantMessage = "";
+      
+      if (!reader) throw new Error("Pas de flux de réponse");
+
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? ""; // keep the incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const dataStr = line.slice(6);
+            if (!dataStr.trim()) continue;
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.error) throw new Error(data.error);
+              if (data.text) assistantMessage += data.text;
+              if (data.imageUrl) setImageUrl(data.imageUrl);
+              if (data.videoUrl) setVideoUrl(data.videoUrl);
+              
+              setMessages((prev) => {
+                const updated = [...prev];
+                updated[updated.length - 1].content = assistantMessage;
+                return updated;
+              });
+            } catch (e) {
+              if (e instanceof Error && e.message !== "Unexpected end of JSON input") {
+                 throw e;
+              }
+            }
+          }
+        }
+      }
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue");
+      setMessages((prev) => {
+         if (prev[prev.length -1]?.role === "assistant" && !prev[prev.length -1].content) {
+            return prev.slice(0, -1);
+         }
+         return prev;
+      });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <h2 className="mb-4 text-sm font-medium text-studio-muted">{title}</h2>
+    <div className="flex h-full flex-col liquid-glass-card rounded-xl p-4 overflow-hidden">
+      <h2 className="mb-4 font-display text-2xl text-studio-text opacity-70">{title}</h2>
 
-      <div className="flex-1 space-y-3 overflow-y-auto rounded-lg border border-studio-border bg-studio-panel p-4">
+      <div className="flex-1 space-y-4 overflow-y-auto pr-2 mb-4">
         {messages.length === 0 && (
           <p className="text-sm text-studio-muted">{placeholder}</p>
         )}
@@ -76,8 +150,8 @@ export default function ChatPanel({ mode }: { mode: WorkspaceMode }) {
             key={i}
             className={
               m.role === "user"
-                ? "ml-auto max-w-[80%] rounded-lg bg-studio-accentDark/20 p-3 text-sm"
-                : "mr-auto max-w-[80%] rounded-lg bg-studio-border/40 p-3 text-sm"
+                ? "ml-auto max-w-[80%] rounded-lg bg-studio-accent p-3 text-sm text-white"
+                : "mr-auto max-w-[80%] rounded-lg liquid-glass-card-light p-3 text-sm text-studio-text"
             }
           >
             {m.content}
@@ -90,18 +164,18 @@ export default function ChatPanel({ mode }: { mode: WorkspaceMode }) {
         {error && <p className="text-sm text-red-400">{error}</p>}
       </div>
 
-      <div className="mt-3 flex gap-2">
+      <div className="mt-auto flex gap-2">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           placeholder={placeholder}
-          className="flex-1 rounded-lg border border-studio-border bg-studio-panel px-3 py-2 text-sm outline-none focus:border-studio-accent"
+          className="flex-1 liquid-glass-card-light rounded-lg border border-studio-border px-4 py-3 text-sm text-studio-text placeholder-studio-muted outline-none focus:border-studio-accent focus:ring-1 focus:ring-studio-accent"
         />
         <button
           onClick={sendMessage}
           disabled={loading}
-          className="rounded-lg bg-studio-accent px-4 py-2 text-sm font-medium text-studio-bg disabled:opacity-50"
+          className="rounded-lg bg-studio-accent px-6 py-3 text-sm font-medium text-white shadow-md transition-colors hover:bg-studio-accentDark disabled:opacity-50"
         >
           {loading ? "..." : "Envoyer"}
         </button>

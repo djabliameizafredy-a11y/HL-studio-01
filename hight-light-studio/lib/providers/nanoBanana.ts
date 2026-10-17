@@ -42,9 +42,15 @@ export async function callNanoBanana(
   const data = await response.json();
   // La structure exacte de la réponse (base64 image dans les parts) est à
   // confirmer avec la doc officielle au moment de l'implémentation réelle.
-  const imageUrl = data.candidates?.[0]?.content?.parts?.find(
+  const base64Data = data.candidates?.[0]?.content?.parts?.find(
     (p: any) => p.inlineData
   )?.inlineData?.data;
+  
+  const mimeType = data.candidates?.[0]?.content?.parts?.find(
+    (p: any) => p.inlineData
+  )?.inlineData?.mimeType || "image/jpeg";
+
+  const imageUrl = base64Data ? `data:${mimeType};base64,${base64Data}` : undefined;
 
   return {
     provider: "nano-banana",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import WorkspaceToolbar from "@/components/WorkspaceToolbar";
 
 type AgentStep =
   | { type: "text"; content: string }
@@ -59,17 +60,22 @@ export default function AgentPanel() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <h2 className="mb-1 text-sm font-medium text-studio-muted">
+    <div className="flex h-full flex-col liquid-glass-card rounded-xl p-4 overflow-hidden">
+      <h2 className="mb-1 font-display text-2xl text-studio-text opacity-70">
         Mode Agent — Code &amp; architecture
       </h2>
-      <p className="mb-4 text-xs text-studio-muted">
+      <p className="mb-3 text-sm text-studio-muted">
         L'agent lit/écrit des fichiers et exécute des commandes dans un
         workspace isolé (dossier <code>workspace/</code>). Voir README pour
         les précautions de sécurité avant tout déploiement public.
       </p>
 
-      <div className="flex-1 space-y-2 overflow-y-auto rounded-lg border border-studio-border bg-studio-panel p-4">
+      {/* Barre d'outils Import */}
+      <div className="mb-3 pb-3 border-b border-studio-border">
+        <WorkspaceToolbar />
+      </div>
+
+      <div className="flex-1 space-y-3 overflow-y-auto pr-2 mb-4">
         {steps.length === 0 && (
           <p className="text-sm text-studio-muted">
             Ex : "Crée un fichier utils.ts avec une fonction slugify, puis
@@ -124,18 +130,18 @@ export default function AgentPanel() {
         )}
       </div>
 
-      <div className="mt-3 flex gap-2">
+      <div className="mt-auto flex gap-2">
         <input
           value={task}
           onChange={(e) => setTask(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && runTask()}
           placeholder="Décris la tâche à réaliser..."
-          className="flex-1 rounded-lg border border-studio-border bg-studio-panel px-3 py-2 text-sm outline-none focus:border-studio-accent"
+          className="flex-1 liquid-glass-card-light rounded-lg border border-studio-border px-4 py-3 text-sm text-studio-text placeholder-studio-muted outline-none focus:border-studio-accent focus:ring-1 focus:ring-studio-accent"
         />
         <button
           onClick={runTask}
           disabled={running}
-          className="rounded-lg bg-studio-accent px-4 py-2 text-sm font-medium text-studio-bg disabled:opacity-50"
+          className="rounded-lg bg-studio-accent px-6 py-3 text-sm font-medium text-white shadow-md transition-colors hover:bg-studio-accentDark disabled:opacity-50"
         >
           {running ? "..." : "Lancer"}
         </button>

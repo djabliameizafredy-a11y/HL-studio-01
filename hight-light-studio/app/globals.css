@@ -1,6 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;1,400&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --font-inter: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-instrument: 'Instrument Serif', Georgia, serif;
+}
 
 html,
 body {
@@ -9,4 +17,26 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+@layer utilities {
+  .liquid-glass-navbar {
+    @apply bg-white/70 backdrop-blur-md border-b border-studio-border;
+  }
+  
+  .liquid-glass-card {
+    @apply bg-white/60 backdrop-blur-lg border border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
+  }
+
+  .liquid-glass-card-light {
+    @apply bg-white/40 backdrop-blur-md border border-white/40 shadow-sm;
+  }
+  
+  .liquid-glass-pill {
+    @apply bg-white/50 backdrop-blur-sm border border-white/30 rounded-full shadow-sm;
+  }
+
+  .liquid-glass-pane {
+    @apply bg-white/40 backdrop-blur-xl border border-white/20 shadow-[0_4px_24px_0_rgba(31,38,135,0.05)] rounded-2xl;
+  }
 }
