@@ -52,6 +52,14 @@ export interface PendingConfirmation {
 
 export const pendingConfirmations = new Map<string, PendingConfirmation>();
 
+// Outils internes qui exécutent du code ou agissent hors des fichiers du
+// workspace : l'utilisateur doit approuver CHAQUE appel, sauf s'il a
+// activé l'auto-approbation pour la session (cases à cocher de l'UI, ou
+// "autoApprove": true en mode headless). Les outils MCP, eux, demandent
+// toujours une confirmation.
+export const CONFIRM_TOOLS = new Set(["run_command", "git_create_branch", "git_create_pr"]);
+export const autoApproveSessions = new Set<string>();
+
 /**
  * Boucle d'agent interne — utilisable directement par le coordinateur
  * de sous-agents parallèles (parallelAgents.ts). Accepte un system prompt
@@ -122,14 +130,18 @@ export async function* runSingleAgent(
 
       const toolResults: Anthropic.ToolResultBlockParam[] = [];
       for (const toolUse of toolUseBlocks) {
-        // Exécution MCP ou interne
-        if (toolUse.name.startsWith("mcp__")) {
-          // MCP : On met en pause et on attend la confirmation utilisateur
-          yield { 
-            type: "pending_confirmation", 
-            toolCallId: toolUse.id, 
-            name: toolUse.name, 
-            input: toolUse.input 
+        const isMcp = toolUse.name.startsWith("mcp__");
+        const needsConfirm =
+          isMcp ||
+          (CONFIRM_TOOLS.has(toolUse.name) && !autoApproveSessions.has(sessionId));
+
+        if (needsConfirm) {
+          // Pause : la boucle attend un vrai clic utilisateur (/api/agent/confirm).
+          yield {
+            type: "pending_confirmation",
+            toolCallId: toolUse.id,
+            name: toolUse.name,
+            input: toolUse.input,
           };
 
           const approved = await new Promise<boolean>((resolve) => {
@@ -142,38 +154,33 @@ export async function* runSingleAgent(
 
             pendingConfirmations.set(toolUse.id, { resolve, sessionId, timeoutId });
           });
-          
+
           if (pendingConfirmations.has(toolUse.id)) {
             clearTimeout(pendingConfirmations.get(toolUse.id)!.timeoutId);
             pendingConfirmations.delete(toolUse.id);
           }
 
           if (!approved) {
-            const output = "⚠️ Outil non exécuté : L'utilisateur a refusé l'exécution de cet outil externe (ou le délai de 5 minutes a expiré).";
+            const output =
+              "⚠️ Action non exécutée : l'utilisateur l'a refusée (ou le délai de 5 minutes a expiré).";
             yield { type: "tool_result", name: toolUse.name, output };
             toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: output });
             continue;
           }
-
-          yield { type: "tool_use", name: toolUse.name, input: toolUse.input };
-          const [, serverName, ...toolNameParts] = toolUse.name.split("__");
-          const realToolName = toolNameParts.join("__");
-          const output = await executeMcpTool(serverName, realToolName, toolUse.input);
-          
-          yield { type: "tool_result", name: toolUse.name, output };
-          toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: output });
-        } else {
-          // Outil interne classique
-          yield { type: "tool_use", name: toolUse.name, input: toolUse.input };
-          const output = await executeTool(toolUse.name, toolUse.input);
-          
-          yield { type: "tool_result", name: toolUse.name, output };
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: toolUse.id,
-            content: output,
-          });
         }
+
+        yield { type: "tool_use", name: toolUse.name, input: toolUse.input };
+
+        let output: string;
+        if (isMcp) {
+          const [, serverName, ...toolNameParts] = toolUse.name.split("__");
+          output = await executeMcpTool(serverName, toolNameParts.join("__"), toolUse.input);
+        } else {
+          output = await executeTool(toolUse.name, toolUse.input);
+        }
+
+        yield { type: "tool_result", name: toolUse.name, output };
+        toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: output });
       }
 
       messages.push({ role: "user", content: toolResults });

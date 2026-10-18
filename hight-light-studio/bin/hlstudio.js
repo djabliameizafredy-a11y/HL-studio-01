@@ -3,10 +3,13 @@
 // HL Studio — Point d'entrée CLI
 // Usage : npx hlstudio | hlstudio | node bin/hlstudio.js
 // Options : --port <number> ou HLSTUDIO_PORT=<number>
+//           --workspace <dossier> ou HLSTUDIO_WORKSPACE=<dossier>
 
 import { createServer } from "node:http";
 import { parse } from "node:url";
 import { resolve, join } from "node:path";
+import { homedir } from "node:os";
+import { mkdirSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
@@ -28,8 +31,27 @@ function getPort() {
   return 0; // 0 = let the OS pick
 }
 
+// Dossier de travail de l'agent. Priorité : --workspace > HLSTUDIO_WORKSPACE
+// > AGENT_WORKSPACE_DIR > ~/.hlstudio/workspace.
+// Important : le serveur standalone fait process.chdir() dans son propre
+// dossier (le cache npx ou node_modules global) — sans valeur explicite,
+// le workspace atterrirait là et serait perdu à chaque mise à jour.
+function getWorkspace() {
+  const idx = process.argv.indexOf("--workspace");
+  const fromFlag = idx !== -1 ? process.argv[idx + 1] : undefined;
+  const chosen =
+    fromFlag ||
+    process.env.HLSTUDIO_WORKSPACE ||
+    process.env.AGENT_WORKSPACE_DIR ||
+    join(homedir(), ".hlstudio", "workspace");
+  const abs = resolve(chosen);
+  mkdirSync(abs, { recursive: true });
+  return abs;
+}
+
 async function main() {
   const requestedPort = getPort();
+  process.env.AGENT_WORKSPACE_DIR = getWorkspace();
 
   // --- Dynamic imports (ESM packages) ---
   let getPortFn;
@@ -111,6 +133,7 @@ async function main() {
 
   const url = `http://localhost:${port}`;
   console.log(`  ✅ Serveur démarré sur ${url}`);
+  console.log(`  📁 Workspace de l'agent : ${process.env.AGENT_WORKSPACE_DIR}`);
   console.log("");
 
   // --- Ouvrir le navigateur ---

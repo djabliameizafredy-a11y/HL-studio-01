@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import WorkspaceToolbar from "@/components/WorkspaceToolbar";
 
 type AgentStep =
   | { type: "text"; content: string }
   | { type: "tool_use"; name: string; input: unknown }
   | { type: "tool_result"; name: string; output: string }
+  | { type: "pending_confirmation"; toolCallId: string; name: string; input: unknown }
   | { type: "done" }
   | { type: "error"; message: string };
 
@@ -14,17 +15,38 @@ export default function AgentPanel() {
   const [task, setTask] = useState("");
   const [steps, setSteps] = useState<AgentStep[]>([]);
   const [running, setRunning] = useState(false);
+  // Auto-approbation des COMMANDES pour la prochaine tâche (les outils MCP
+  // externes demandent toujours une confirmation).
+  const [autoApprove, setAutoApprove] = useState(false);
+  // Décision prise pour chaque demande de confirmation (par toolCallId).
+  const [decisions, setDecisions] = useState<Record<string, "approved" | "denied">>({});
+  const sessionIdRef = useRef<string | null>(null);
+
+  async function answerConfirmation(toolCallId: string, approved: boolean) {
+    setDecisions((d) => ({ ...d, [toolCallId]: approved ? "approved" : "denied" }));
+    try {
+      await fetch("/api/agent/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toolCallId, sessionId: sessionIdRef.current, approved }),
+      });
+    } catch {
+      // Si l'envoi échoue, la demande expirera côté serveur (refus après 5 min).
+    }
+  }
 
   async function runTask() {
     if (!task.trim() || running) return;
     setSteps([]);
+    setDecisions({});
+    sessionIdRef.current = null;
     setRunning(true);
 
     try {
       const res = await fetch("/api/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task }),
+        body: JSON.stringify({ task, autoApprove }),
       });
 
       if (!res.body) throw new Error("Pas de flux de réponse du serveur.");
@@ -43,7 +65,12 @@ export default function AgentPanel() {
 
         for (const line of lines) {
           if (!line.trim()) continue;
-          setSteps((prev) => [...prev, JSON.parse(line)]);
+          const parsed = JSON.parse(line);
+          if (parsed.type === "session_id") {
+            sessionIdRef.current = parsed.sessionId;
+            continue; // événement technique, pas affiché
+          }
+          setSteps((prev) => [...prev, parsed]);
         }
       }
     } catch (err) {
@@ -108,6 +135,42 @@ export default function AgentPanel() {
               </pre>
             );
           }
+          if (step.type === "pending_confirmation") {
+            const decision = decisions[step.toolCallId];
+            return (
+              <div
+                key={i}
+                className="rounded-lg border border-amber-400/60 bg-amber-400/10 p-3 text-sm"
+              >
+                <p className="mb-1 font-medium text-studio-text">
+                  L'agent demande l'autorisation d'exécuter : <code>{step.name}</code>
+                </p>
+                <pre className="mb-2 max-h-40 overflow-y-auto whitespace-pre-wrap rounded bg-studio-bg p-2 font-mono text-xs text-studio-muted">
+                  {JSON.stringify(step.input, null, 2)}
+                </pre>
+                {decision ? (
+                  <p className="text-xs text-studio-muted">
+                    {decision === "approved" ? "✓ Autorisé" : "✗ Refusé"}
+                  </p>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => answerConfirmation(step.toolCallId, true)}
+                      className="rounded-md bg-studio-accent px-4 py-1.5 text-xs font-medium text-white hover:bg-studio-accentDark"
+                    >
+                      Autoriser
+                    </button>
+                    <button
+                      onClick={() => answerConfirmation(step.toolCallId, false)}
+                      className="rounded-md border border-studio-border px-4 py-1.5 text-xs text-studio-text hover:bg-studio-bg"
+                    >
+                      Refuser
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          }
           if (step.type === "error") {
             return (
               <p key={i} className="text-sm text-red-400">
@@ -129,6 +192,17 @@ export default function AgentPanel() {
           <p className="text-sm text-studio-muted">L'agent travaille...</p>
         )}
       </div>
+
+      <label className="mb-2 flex items-center gap-2 text-xs text-studio-muted">
+        <input
+          type="checkbox"
+          checked={autoApprove}
+          onChange={(e) => setAutoApprove(e.target.checked)}
+          disabled={running}
+        />
+        Exécuter les commandes sans me demander (cette tâche uniquement).
+        Les outils externes (MCP) demandent toujours ton accord.
+      </label>
 
       <div className="mt-auto flex gap-2">
         <input

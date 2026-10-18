@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import { resolveSafePath, ensureWorkspace } from "./sandbox";
+import { resolveSafePathReal, ensureWorkspace } from "./sandbox";
 import fs from "node:fs/promises";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -47,7 +47,7 @@ export async function connectMcpServers(): Promise<void> {
   await disconnectMcpServers();
   
   await ensureWorkspace();
-  const configPath = resolveSafePath(MCP_CONFIG_PATH);
+  const configPath = await resolveSafePathReal(MCP_CONFIG_PATH);
   
   let config: McpConfig;
   try {
@@ -75,12 +75,11 @@ export async function connectMcpServers(): Promise<void> {
         transport = new StdioClientTransport({
           command: srvConfig.command,
           args: srvConfig.args || [],
-          env: {
-            ...Object.fromEntries(
-              Object.entries(process.env).filter((e): e is [string, string] => e[1] !== undefined)
-            ),
-            ...srvConfig.env,
-          }
+          // On ne transmet QUE l'env déclaré pour ce serveur dans mcp.json :
+          // le SDK y ajoute lui-même un socle sûr (PATH, HOME, TEMP...).
+          // Hériter de tout process.env donnerait toutes nos clés IA à
+          // chaque serveur MCP tiers.
+          env: { ...srvConfig.env },
         });
       } else if (srvConfig.transport === "sse") {
         if (!srvConfig.url) throw new Error("Paramètre 'url' manquant pour le transport sse");

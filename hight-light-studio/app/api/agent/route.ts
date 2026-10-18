@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { runAgent } from "@/lib/agent/agentLoop";
+import { runAgent, autoApproveSessions } from "@/lib/agent/agentLoop";
 import { runParallelAgents, SubAgentConfig } from "@/lib/agent/parallelAgents";
 
 // ⚠️ Ce endpoint exécute des commandes shell côté serveur (voir
@@ -49,6 +49,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Auto-approbation des commandes pour CETTE session uniquement (les
+  // outils MCP demandent toujours une confirmation).
+  if (body?.autoApprove === true) autoApproveSessions.add(sessionId);
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -70,6 +74,7 @@ export async function POST(req: NextRequest) {
           encoder.encode(JSON.stringify({ type: "error", message }) + "\n")
         );
       } finally {
+        autoApproveSessions.delete(sessionId);
         controller.close();
       }
     },

@@ -1,6 +1,7 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import { resolveSafePath, WORKSPACE_ROOT, ensureWorkspace } from "./sandbox";
+import { resolveSafePathReal, WORKSPACE_ROOT, ensureWorkspace } from "./sandbox";
+import { safeEnv } from "./safeEnv";
 import fs from "node:fs/promises";
 
 // ⚠️ SÉCURITÉ — Les hooks exécutent du code arbitraire dans le workspace.
@@ -54,7 +55,7 @@ export async function loadHooksConfig(): Promise<HooksConfig> {
 
   try {
     await ensureWorkspace();
-    const configPath = resolveSafePath(HOOKS_CONFIG_PATH);
+    const configPath = await resolveSafePathReal(HOOKS_CONFIG_PATH);
     const raw = await fs.readFile(configPath, "utf-8");
     cachedConfig = JSON.parse(raw) as HooksConfig;
     configLoadedAt = now;
@@ -119,11 +120,10 @@ export async function executeHooks(
         cwd: WORKSPACE_ROOT,
         timeout,
         maxBuffer: 512 * 1024,
-        env: {
-          ...process.env,
+        env: safeEnv({
           ...envVars,
           WORKSPACE_ROOT,
-        },
+        }),
       });
 
       results.push({

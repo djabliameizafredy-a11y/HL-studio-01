@@ -31,3 +31,51 @@ export function resolveSafePath(relativePath: string): string {
   }
   return resolved;
 }
+
+/**
+ * Version qui suit les liens symboliques.
+ *
+ * `resolveSafePath` ne regarde que le texte du chemin : un lien symbolique
+ * créé dans le workspace (ex: `ln -s /etc/passwd leak.txt` via
+ * run_command) le contourne, car `leak.txt` est bien "dans" le workspace
+ * alors que sa cible n'y est pas. Ici on résout le chemin RÉEL et on
+ * vérifie qu'il reste dans le workspace (réel).
+ *
+ * Gère aussi les chemins qui n'existent pas encore (écriture) en
+ * vérifiant le plus proche ancêtre existant, et refuse les liens
+ * "pendants" (cible inexistante) qui permettraient d'écrire hors zone.
+ */
+export async function resolveSafePathReal(relativePath: string): Promise<string> {
+  const lexical = resolveSafePath(relativePath);
+  const rootReal = await fs.realpath(WORKSPACE_ROOT).catch(() => WORKSPACE_ROOT);
+  const inside = (p: string) => p === rootReal || p.startsWith(rootReal + path.sep);
+  const refuse = () =>
+    new Error(`Chemin refusé : "${relativePath}" pointe hors du workspace (lien symbolique ?).`);
+
+  // 1. La cible elle-même est-elle un lien ?
+  try {
+    const st = await fs.lstat(lexical);
+    if (st.isSymbolicLink()) {
+      const real = await fs.realpath(lexical).catch(() => null);
+      if (!real || !inside(real)) throw refuse();
+    }
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+  }
+
+  // 2. Le plus proche ancêtre existant doit rester dans le workspace réel
+  let probe = lexical;
+  for (;;) {
+    try {
+      const real = await fs.realpath(probe);
+      if (!inside(real)) throw refuse();
+      break;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+      const parent = path.dirname(probe);
+      if (parent === probe) throw refuse();
+      probe = parent;
+    }
+  }
+  return lexical;
+}
