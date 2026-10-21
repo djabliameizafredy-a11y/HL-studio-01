@@ -170,11 +170,13 @@ export default function ChatPanel({ mode, model }: { mode: WorkspaceMode, model?
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           placeholder={placeholder}
+          data-help="Écris ton message puis appuie sur Entrée ou sur « Envoyer »."
           className="flex-1 liquid-glass-card-light rounded-lg border border-studio-border px-4 py-3 text-sm text-studio-text placeholder-studio-muted outline-none focus:border-studio-accent focus:ring-1 focus:ring-studio-accent"
         />
         <button
           onClick={sendMessage}
           disabled={loading}
+          data-help="Envoie ton message au modèle sélectionné en haut à droite. L'envoi utilise ta clé API."
           className="rounded-lg bg-studio-accent px-6 py-3 text-sm font-medium text-white shadow-md transition-colors hover:bg-studio-accentDark disabled:opacity-50"
         >
           {loading ? "..." : "Envoyer"}

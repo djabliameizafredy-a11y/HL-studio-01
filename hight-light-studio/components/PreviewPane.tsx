@@ -145,6 +145,7 @@ export default function PreviewPane() {
             <button
               key={t}
               onClick={() => setTab(t)}
+              data-help={t === "preview" ? "Onglet Aperçu : voir en direct l'application construite par l'agent." : "Onglet Fichiers : parcourir et lire les fichiers du workspace."}
               className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
                 tab === t
                   ? "bg-studio-accent text-white shadow-sm"
@@ -161,6 +162,7 @@ export default function PreviewPane() {
               onClick={() => setPreviewError(null)}
               className="text-xs text-studio-muted hover:text-studio-text transition-colors"
               title="Recharger"
+              data-help="Recharge l'aperçu."
             >
               ↺
             </button>
@@ -170,6 +172,7 @@ export default function PreviewPane() {
           <div className="relative" ref={exportRef}>
             <button
               onClick={() => { setExportOpen(o => !o); setExportStatus(null); }}
+              data-help="Exporte le workspace : télécharger en .zip ou pousser vers GitHub."
               className="flex items-center gap-1 rounded-lg bg-white/60 border border-studio-border px-3 py-1 text-xs font-medium text-studio-text hover:bg-white/80 transition-all shadow-sm"
             >
               📤 Exporter

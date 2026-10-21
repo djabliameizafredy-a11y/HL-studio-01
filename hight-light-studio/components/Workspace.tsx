@@ -7,12 +7,14 @@ import AgentPanel from "@/components/AgentPanel";
 import DesignPanel from "@/components/DesignPanel";
 import VideoPanel from "@/components/VideoPanel";
 import PreviewPane from "@/components/PreviewPane";
+import HelperBot from "@/components/HelperBot";
+import BotToggle from "@/components/BotToggle";
 
-const TABS: { id: WorkspaceMode; label: string; emoji: string }[] = [
-  { id: "chat", label: "Chat", emoji: "💬" },
-  { id: "code", label: "Code", emoji: "🛠" },
-  { id: "design", label: "Design", emoji: "🎨" },
-  { id: "video", label: "Vidéo", emoji: "🎬" },
+const TABS: { id: WorkspaceMode; label: string; emoji: string; help: string }[] = [
+  { id: "chat", label: "Chat", emoji: "💬", help: "Chat : discute avec le modèle d'IA (questions, idées, rédaction)." },
+  { id: "code", label: "Code", emoji: "🛠", help: "Code : l'agent lit et modifie les fichiers de ton workspace. Il te demande ton accord avant d'exécuter une commande." },
+  { id: "design", label: "Design", emoji: "🎨", help: "Design : génère des visuels à partir d'une description." },
+  { id: "video", label: "Vidéo", emoji: "🎬", help: "Vidéo : génère une courte vidéo à partir d'un texte." },
 ];
 
 // Modèles disponibles selon le mode actif
@@ -68,9 +70,11 @@ export default function Workspace() {
         </div>
 
         <div className="flex items-center gap-3">
+          <BotToggle />
           {/* Model selector */}
           <select
             value={selectedModels[active]}
+            data-help="Modèle d'IA utilisé dans ce mode. Chaque mode a sa propre liste."
             onChange={handleModelChange}
             className="rounded-lg border border-studio-border bg-white/60 backdrop-blur-sm px-3 py-1.5 text-xs text-studio-text outline-none focus:border-studio-accent transition-colors"
           >
@@ -86,6 +90,7 @@ export default function Workspace() {
                 key={tab.id}
                 onClick={() => setActive(tab.id)}
                 title={tab.label}
+                data-help={tab.help}
                 className={
                   active === tab.id
                     ? "rounded-full bg-studio-accent px-4 py-1.5 text-xs font-medium text-white shadow-md transition-all"
@@ -115,6 +120,8 @@ export default function Workspace() {
           <PreviewPane />
         </div>
       </div>
+
+      <HelperBot panel={active} />
     </div>
   );
 }

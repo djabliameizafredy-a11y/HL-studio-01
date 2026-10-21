@@ -87,6 +87,7 @@ export default function WorkspaceToolbar() {
         <div className="relative">
           <button
             onClick={() => setImportMode(importMode ? null : "file")}
+            data-help="Importe des fichiers, un .zip ou un dépôt GitHub dans le workspace de l'agent."
             className="flex items-center gap-1.5 rounded-lg bg-white/60 border border-studio-border px-3 py-1.5 text-xs font-medium text-studio-text hover:bg-white/80 transition-all shadow-sm"
           >
             📥 Importer

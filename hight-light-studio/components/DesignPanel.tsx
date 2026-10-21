@@ -164,6 +164,7 @@ export default function DesignPanel({ model }: { model?: ModelId }) {
             type="text"
             className="flex-1 liquid-glass-card-light rounded-lg border-studio-border p-3 text-studio-text placeholder-studio-muted focus:border-studio-accent focus:outline-none focus:ring-1 focus:ring-studio-accent"
             placeholder="Générer un design..."
+            data-help="Décris le visuel voulu : style, couleurs, format. Entrée pour lancer."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && sendMessage()}
@@ -172,6 +173,7 @@ export default function DesignPanel({ model }: { model?: ModelId }) {
           <button
             onClick={sendMessage}
             disabled={loading}
+            data-help="Lance la génération avec le modèle sélectionné. Cela utilise ta clé API."
             className="rounded-lg bg-studio-accent px-6 py-3 font-medium text-white hover:bg-studio-accentDark disabled:opacity-50 transition-colors shadow-md"
           >
             {loading ? "..." : "Générer"}

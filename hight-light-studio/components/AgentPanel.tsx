@@ -193,7 +193,10 @@ export default function AgentPanel() {
         )}
       </div>
 
-      <label className="mb-2 flex items-center gap-2 text-xs text-studio-muted">
+      <label
+        className="mb-2 flex items-center gap-2 text-xs text-studio-muted"
+        data-help="Si tu coches cette case, l'agent exécute ses commandes sans te demander. Garde-la décochée si tu veux valider chaque commande."
+      >
         <input
           type="checkbox"
           checked={autoApprove}
@@ -210,11 +213,13 @@ export default function AgentPanel() {
           onChange={(e) => setTask(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && runTask()}
           placeholder="Décris la tâche à réaliser..."
+          data-help="Décris la tâche en une phrase. Tape /nom pour lancer un skill de .hlstudio/skills."
           className="flex-1 liquid-glass-card-light rounded-lg border border-studio-border px-4 py-3 text-sm text-studio-text placeholder-studio-muted outline-none focus:border-studio-accent focus:ring-1 focus:ring-studio-accent"
         />
         <button
           onClick={runTask}
           disabled={running}
+          data-help="Lance l'agent sur ta tâche. Il travaille dans le dossier workspace."
           className="rounded-lg bg-studio-accent px-6 py-3 text-sm font-medium text-white shadow-md transition-colors hover:bg-studio-accentDark disabled:opacity-50"
         >
           {running ? "..." : "Lancer"}
