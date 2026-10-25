@@ -1,10 +1,12 @@
 import path from "node:path";
 import fs from "node:fs/promises";
-import { exec, execFile } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { resolveSafePathReal, WORKSPACE_ROOT, ensureWorkspace } from "./sandbox";
-import { executeHooks, invalidateHooksCache } from "./hooks";
+import { executeHooks } from "./hooks";
 import { safeEnv } from "./safeEnv";
+import { IsolationError, runIsolatedCommand } from "./openSandbox";
+import { executeBrowser, previewUrl, type BrowserAction } from "./browser";
 import {
   getGithubToken,
   gitAuthEnv,
@@ -14,7 +16,6 @@ import {
 } from "@/lib/workspace/github";
 import type { AiTool } from "@/lib/ai/types";
 
-const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 
@@ -34,16 +35,8 @@ const execFileAsync = promisify(execFile);
 // E2B (https://e2b.dev), un conteneur Docker éphémère, ou une VM
 // Firecracker. Ne JAMAIS exposer /api/agent sans authentification, même en
 // interne.
-const BLOCKED_PATTERNS = [
-  /rm\s+-rf\s+\//, // suppression à la racine
-  /sudo/, // élévation de privilèges
-  /:\(\)\{.*:\|:.*\};:/, // fork bomb
-  /mkfs/, // formatage disque
-  /dd\s+if=/, // écriture disque bas niveau
-  />\s*\/dev\/sd/, // écriture directe sur un disque
-  /curl.*\|\s*sh/, // pipe curl vers shell (téléchargement + exécution)
-  /wget.*\|\s*sh/,
-];
+// Les motifs dangereux sont centralisés dans openSandbox.ts
+// (inspectCommand) pour que run_command et les hooks partagent le même filet.
 
 // Les schémas sont exprimés dans le format neutre de lib/ai : chaque
 // adaptateur de protocole les traduit vers la forme attendue par son API.
@@ -137,6 +130,26 @@ export const toolDefinitions: AiTool[] = [
       required: ["title", "head"],
     },
   },
+  {
+    name: "browser",
+    description:
+      "Automatise un navigateur (Playwright) : ouvrir une page, cliquer, remplir un champ, capturer, inspecter. Désactivé par défaut — l'utilisateur doit l'activer dans Réglages → Isolation. Chaque appel demande une confirmation. Pour contrôler le panneau Preview, ouvre " +
+      previewUrl() +
+      ".",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["open", "click", "fill", "screenshot", "inspect", "close"],
+        },
+        url: { type: "string", description: "URL http(s) pour action=open." },
+        selector: { type: "string", description: "Sélecteur CSS pour click/fill/inspect." },
+        value: { type: "string", description: "Valeur à saisir pour action=fill." },
+      },
+      required: ["action"],
+    },
+  },
 ];
 
 export async function executeTool(name: string, input: any): Promise<string> {
@@ -199,9 +212,6 @@ export async function executeTool(name: string, input: any): Promise<string> {
 
       case "run_command": {
         const command: string = input.command ?? "";
-        if (BLOCKED_PATTERNS.some((pattern) => pattern.test(command))) {
-          return "⚠️ Commande refusée par le filet de sécurité minimal (voir lib/agent/tools.ts).";
-        }
 
         // Hook before_command — peut bloquer l'exécution si blocking=true
         try {
@@ -216,13 +226,15 @@ export async function executeTool(name: string, input: any): Promise<string> {
           // Erreur dans les hooks → on continue quand même
         }
 
-        const { stdout, stderr } = await execAsync(command, {
-          cwd: WORKSPACE_ROOT,
-          timeout: 20_000,
-          maxBuffer: 1024 * 1024,
-          env: safeEnv(),
-        });
-        return (stdout + stderr).trim() || "(pas de sortie)";
+        try {
+          const { output, isolation } = await runIsolatedCommand(command);
+          return isolation === "local" ? output : `[${isolation}]\n${output}`;
+        } catch (err) {
+          if (err instanceof IsolationError) {
+            return `⚠️ ${err.message}`;
+          }
+          throw err;
+        }
       }
 
       case "git_create_branch": {
@@ -309,6 +321,10 @@ export async function executeTool(name: string, input: any): Promise<string> {
           const errMsg = err instanceof Error ? err.message : String(err);
           throw new Error(maskSecrets(errMsg, token));
         }
+      }
+
+      case "browser": {
+        return await executeBrowser(input as BrowserAction);
       }
 
       default:

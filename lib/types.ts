@@ -52,6 +52,22 @@ export interface HlPreferences {
   theme: "light" | "dark" | "system";
 }
 
+/**
+ * Isolation des commandes de l'agent.
+ * - local : filet local (HOME isolé, audit des liens, motifs bloqués).
+ * - docker : même filet, plus un `docker run --rm` éphémère (optionnel).
+ * - opensandbox : même filet, plus le binaire `opensandbox` s'il est installé.
+ */
+export type IsolationMode = "local" | "docker" | "opensandbox";
+
+export const ISOLATION_MODES: IsolationMode[] = ["local", "docker", "opensandbox"];
+
+export interface IsolationPreferences {
+  mode: IsolationMode;
+  /** Autorise Playwright (désactivé par défaut : il parle au réseau). */
+  browserEnabled: boolean;
+}
+
 export interface HlIntegrations {
   /**
    * Token GitHub pour l'import et le push de dépôts. Stocké au même
@@ -70,6 +86,7 @@ export interface HlConfig {
   /** Modèle du bot assistant d'interface. */
   assistantModelId: string | null;
   preferences: HlPreferences;
+  isolation: IsolationPreferences;
   integrations: HlIntegrations;
 }
 

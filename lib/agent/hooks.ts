@@ -1,15 +1,11 @@
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
-import { resolveSafePathReal, WORKSPACE_ROOT, ensureWorkspace } from "./sandbox";
-import { safeEnv } from "./safeEnv";
+import { inspectCommand, runIsolatedCommand } from "./openSandbox";
+import { resolveSafePathReal, ensureWorkspace } from "./sandbox";
 import fs from "node:fs/promises";
 
 // ⚠️ SÉCURITÉ — Les hooks exécutent du code arbitraire dans le workspace.
 // Même niveau de vigilance que run_command. Ne JAMAIS exposer cette
 // fonctionnalité publiquement sans authentification.
 // Les hooks restent confinés à workspace/ via resolveSafePath.
-
-const execAsync = promisify(exec);
 
 const HOOKS_CONFIG_PATH = ".hlstudio/hooks.json";
 const DEFAULT_HOOK_TIMEOUT = 10_000; // 10 secondes
@@ -114,22 +110,24 @@ export async function executeHooks(
     // La commande utilise les variables d'environnement passées à execAsync
     // Le shell se chargera de l'interpolation (ex: echo $FILE_PATH)
     const command = hook.command;
+    const inspection = inspectCommand(command);
+    if (inspection) {
+      results.push({
+        command,
+        success: false,
+        output: inspection,
+        blocked: event === "before_command" && hook.blocking === true,
+      });
+      if (event === "before_command" && hook.blocking === true) break;
+      continue;
+    }
 
     try {
-      const { stdout, stderr } = await execAsync(command, {
-        cwd: WORKSPACE_ROOT,
-        timeout,
-        maxBuffer: 512 * 1024,
-        env: safeEnv({
-          ...envVars,
-          WORKSPACE_ROOT,
-        }),
-      });
-
+      const { output } = await runIsolatedCommand(command, timeout);
       results.push({
         command: hook.command,
         success: true,
-        output: (stdout + stderr).trim(),
+        output,
         blocked: false,
       });
     } catch (err) {

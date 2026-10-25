@@ -1,4 +1,5 @@
 import type {
+  IsolationMode,
   ModelCapability,
   ModelRecord,
   ProviderProtocol,
@@ -71,6 +72,7 @@ export interface SettingsPatch {
   assistantModelId?: string | null;
   githubToken?: string;
   preferences?: { theme?: string };
+  isolation?: { mode?: IsolationMode; browserEnabled?: boolean };
 }
 
 export const patchSettings = (patch: SettingsPatch) =>

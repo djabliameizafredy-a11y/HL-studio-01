@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import WorkspaceToolbar from "@/components/WorkspaceToolbar";
 
 type AgentStep =
@@ -21,6 +21,28 @@ export default function AgentPanel({ modelId }: { modelId: string }) {
   // Décision prise pour chaque demande de confirmation (par toolCallId).
   const [decisions, setDecisions] = useState<Record<string, "approved" | "denied">>({});
   const sessionIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/history?mode=code");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !data?.session) return;
+        sessionIdRef.current = data.session.id;
+        const restored = Array.isArray(data.session.steps)
+          ? (data.session.steps as AgentStep[])
+          : [];
+        setSteps(restored);
+      } catch {
+        // Un historique illisible ne bloque pas une nouvelle tâche.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function answerConfirmation(toolCallId: string, approved: boolean) {
     setDecisions((d) => ({ ...d, [toolCallId]: approved ? "approved" : "denied" }));

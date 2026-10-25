@@ -3,9 +3,12 @@ import { randomUUID } from "node:crypto";
 import { configFilePath, writeSecretFileSync } from "@/lib/paths";
 import {
   CAPABILITY_BY_MODE,
+  ISOLATION_MODES,
   MODEL_CAPABILITIES,
   WORKSPACE_MODES,
   type HlConfig,
+  type IsolationMode,
+  type IsolationPreferences,
   type ModelCapability,
   type ModelRecord,
   type ProviderProtocol,
@@ -30,6 +33,7 @@ function emptyConfig(): HlConfig {
     assignments: { chat: null, code: null, design: null, video: null },
     assistantModelId: null,
     preferences: { theme: "system" },
+    isolation: { mode: "local", browserEnabled: false },
     integrations: { githubToken: "" },
   };
 }
@@ -61,6 +65,13 @@ function parseConfig(raw: string): HlConfig {
       typeof parsed.assistantModelId === "string" ? parsed.assistantModelId : null,
     preferences: {
       theme: parsed.preferences?.theme ?? "system",
+    },
+    isolation: {
+      mode:
+        parsed.isolation?.mode && ISOLATION_MODES.includes(parsed.isolation.mode)
+          ? parsed.isolation.mode
+          : "local",
+      browserEnabled: parsed.isolation?.browserEnabled === true,
     },
     integrations: {
       githubToken:
@@ -396,6 +407,31 @@ export function setPreferences(input: { theme?: unknown }): void {
       config.preferences.theme = input.theme as HlConfig["preferences"]["theme"];
     }
   });
+}
+
+export function setIsolation(input: Partial<IsolationPreferences>): IsolationPreferences {
+  mutate((config) => {
+    if (input.mode !== undefined) {
+      if (!ISOLATION_MODES.includes(input.mode)) {
+        throw new ConfigValidationError(
+          `Mode d'isolation inconnu. Valeurs acceptées : ${ISOLATION_MODES.join(", ")}.`
+        );
+      }
+      config.isolation.mode = input.mode;
+    }
+    if (input.browserEnabled !== undefined) {
+      config.isolation.browserEnabled = input.browserEnabled === true;
+    }
+  });
+  return readConfig().isolation;
+}
+
+export function getIsolation(): IsolationPreferences {
+  return readConfig().isolation;
+}
+
+export function setIsolationMode(mode: IsolationMode): IsolationPreferences {
+  return setIsolation({ mode });
 }
 
 // --- Résolution à l'exécution -----------------------------------------

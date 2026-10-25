@@ -53,6 +53,7 @@ export const CONFIRM_TOOLS = new Set([
   "run_command",
   "git_create_branch",
   "git_create_pr",
+  "browser",
 ]);
 
 export const autoApproveSessions = new Set<string>();
@@ -63,6 +64,7 @@ const READ_ONLY_FORBIDDEN = new Set([
   "run_command",
   "git_create_branch",
   "git_create_pr",
+  "browser",
 ]);
 
 /**

@@ -4,9 +4,10 @@ import {
   setAssignment,
   setAssistantModel,
   setGithubToken,
+  setIsolation,
   setPreferences,
 } from "@/lib/config/store";
-import { WORKSPACE_MODES, type WorkspaceMode } from "@/lib/types";
+import { ISOLATION_MODES, WORKSPACE_MODES, type IsolationMode, type WorkspaceMode } from "@/lib/types";
 import { errorResponse, jsonError, readJsonBody } from "@/lib/api/respond";
 
 export const runtime = "nodejs";
@@ -26,6 +27,7 @@ interface PatchBody {
   assistantModelId?: string | null;
   githubToken?: string;
   preferences?: { theme?: string };
+  isolation?: { mode?: IsolationMode; browserEnabled?: boolean };
 }
 
 /**
@@ -60,6 +62,25 @@ export async function PATCH(req: NextRequest) {
 
     if (body.preferences) {
       setPreferences(body.preferences);
+    }
+
+    if (body.isolation) {
+      if (
+        body.isolation.mode !== undefined &&
+        !ISOLATION_MODES.includes(body.isolation.mode)
+      ) {
+        return jsonError(
+          400,
+          `Mode d'isolation inconnu. Valeurs acceptées : ${ISOLATION_MODES.join(", ")}.`
+        );
+      }
+      if (
+        body.isolation.browserEnabled !== undefined &&
+        typeof body.isolation.browserEnabled !== "boolean"
+      ) {
+        return jsonError(400, "browserEnabled doit être un booléen.");
+      }
+      setIsolation(body.isolation);
     }
 
     return NextResponse.json(readPublicConfig());

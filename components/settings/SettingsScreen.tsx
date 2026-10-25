@@ -11,6 +11,7 @@ import ProvidersTab from "./ProvidersTab";
 import ModelsTab from "./ModelsTab";
 import ModesTab from "./ModesTab";
 import IntegrationsTab from "./IntegrationsTab";
+import IsolationTab from "./IsolationTab";
 
 export default function SettingsScreen() {
   const [config, setConfig] = useState<PublicConfig | null>(null);
@@ -82,6 +83,7 @@ export default function SettingsScreen() {
           <TabsTrigger value="models">Modèles</TabsTrigger>
           <TabsTrigger value="modes">Modes</TabsTrigger>
           <TabsTrigger value="integrations">Intégrations</TabsTrigger>
+          <TabsTrigger value="isolation">Isolation</TabsTrigger>
         </TabsList>
 
         <TabsContent value="providers">
@@ -95,6 +97,9 @@ export default function SettingsScreen() {
         </TabsContent>
         <TabsContent value="integrations">
           <IntegrationsTab config={config} onChange={reload} onError={setError} />
+        </TabsContent>
+        <TabsContent value="isolation">
+          <IsolationTab config={config} onChange={reload} onError={setError} />
         </TabsContent>
       </Tabs>
     </div>

@@ -89,6 +89,10 @@
   "preferences": {
     "theme": "dark"
   },
+  "isolation": {
+    "mode": "local",
+    "browserEnabled": false
+  },
   "integrations": {
     "githubToken": ""
   }

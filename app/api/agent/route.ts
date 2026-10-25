@@ -1,6 +1,11 @@
 import { NextRequest } from "next/server";
 import { runAgent, autoApproveSessions } from "@/lib/agent/agentLoop";
 import { runParallelAgents, SubAgentConfig } from "@/lib/agent/parallelAgents";
+import {
+  appendAgentSessionStep,
+  createAgentSession,
+  finishAgentSession,
+} from "@/lib/db/agentSessions";
 
 // ⚠️ Ce endpoint exécute des commandes shell côté serveur (voir
 // lib/agent/tools.ts). Ne jamais l'exposer sans authentification.
@@ -64,18 +69,29 @@ export async function POST(req: NextRequest) {
       controller.enqueue(encoder.encode(JSON.stringify({ type: "session_id", sessionId }) + "\n"));
 
       try {
+        createAgentSession(sessionId, task, modelId ?? null);
+
         const agentGenerator = parallelConfig && Array.isArray(parallelConfig) && parallelConfig.length > 0
           ? runParallelAgents(task, sessionId, parallelConfig, modelId)
           : runAgent(task, sessionId, modelId);
 
+        let endedWithError = false;
         for await (const step of agentGenerator) {
+          appendAgentSessionStep(sessionId, step);
+          if (step.type === "error") endedWithError = true;
           controller.enqueue(encoder.encode(JSON.stringify(step) + "\n"));
         }
+        finishAgentSession(sessionId, endedWithError ? "error" : "done");
       } catch (err) {
         const message = err instanceof Error ? err.message : "Erreur inconnue";
-        controller.enqueue(
-          encoder.encode(JSON.stringify({ type: "error", message }) + "\n")
-        );
+        const payload = { type: "error", message };
+        try {
+          appendAgentSessionStep(sessionId, payload);
+          finishAgentSession(sessionId, "error");
+        } catch {
+          // Une erreur de persistance ne doit pas masquer l'erreur originale.
+        }
+        controller.enqueue(encoder.encode(JSON.stringify(payload) + "\n"));
       } finally {
         autoApproveSessions.delete(sessionId);
         controller.close();

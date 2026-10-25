@@ -36,6 +36,8 @@ Le lanceur choisit un port libre, démarre le serveur et ouvre ton navigateur.
 ```bash
 npx hlstudio --port 3210                 # port imposé
 npx hlstudio --workspace ~/mes-projets   # dossier de travail de l'agent
+npx hlstudio --no-open                   # n'ouvre pas le navigateur
+npx hlstudio --help
 ```
 
 ### Depuis les sources
@@ -99,9 +101,10 @@ Tout vit dans `~/.hlstudio` (ou dans le dossier indiqué par `HLSTUDIO_HOME`) :
 
 | Chemin | Contenu |
 |---|---|
-| `~/.hlstudio/config.json` | Fournisseurs, modèles, clés d'API, token GitHub. Créé en `0600`. |
-| `~/.hlstudio/hlstudio.db` | Conversations, messages, historique (SQLite). |
-| `~/.hlstudio/media/` | Images et vidéos générées. |
+| `~/.hlstudio/config.json` | Fournisseurs, modèles, clés d'API, token GitHub, isolation. Créé en `0600`. |
+| `~/.hlstudio/hlstudio.db` | Conversations, messages, sessions Agent (SQLite). |
+| `~/.hlstudio/media/` | Images, vidéos générées et captures Playwright. |
+| `~/.hlstudio/agent-home/` | HOME isolé des commandes de l'agent (jamais tes vraies clés). |
 | `~/.hlstudio/workspace/` | Dossier de travail de l'agent, par défaut. |
 
 Ce dossier est **hors du répertoire d'installation** : une mise à jour de
@@ -118,8 +121,10 @@ L'onglet Code n'est pas un chat : c'est un agent qui lit et écrit des fichiers
 et exécute des commandes pour accomplir une tâche de bout en bout.
 
 **Outils disponibles** : `list_files`, `read_file`, `write_file`,
-`run_command`, `git_create_branch`, `git_diff`, `git_create_pr`, plus tous les
-outils exposés par tes serveurs MCP.
+`run_command`, `git_create_branch`, `git_diff`, `git_create_pr`, `browser`
+(Playwright, désactivé par défaut), plus tous les outils exposés par tes
+serveurs MCP. Les sessions Agent sont enregistrées dans SQLite et relues au
+prochain lancement.
 
 ### Mémoire de projet — `HL.md`
 
@@ -198,9 +203,9 @@ Ce qui est en place :
 - **Bac à sable de fichiers** — toutes les opérations sont confinées au
   workspace. Les chemins sont vérifiés en texte *et* après résolution des
   liens symboliques, y compris pour les fichiers qui n'existent pas encore.
-- **Confirmation humaine** — `run_command`, les opérations Git et tous les
-  outils MCP demandent ton accord. Une demande sans réponse expire au bout de
-  5 minutes.
+- **Confirmation humaine** — `run_command`, les opérations Git, `browser` et
+  tous les outils MCP demandent ton accord. Une demande sans réponse expire
+  au bout de 5 minutes.
 - **Confirmations liées à la session** — une confirmation ne peut pas être
   utilisée par une autre session.
 - **Filtrage des variables d'environnement** — les processus lancés par
@@ -216,9 +221,11 @@ Ce qui est en place :
 Ce qui ne l'est pas encore — lis cette partie avant de dépasser un usage
 personnel :
 
-- `run_command` repose sur une **liste de motifs interdits**, pas sur une vraie
-  isolation. Une liste de blocage se contourne toujours. L'isolation renforcée
-  (OpenSandbox / conteneur éphémère) est le prochain chantier.
+- `run_command` combine un **filet local** (HOME isolé, audit des liens,
+  motifs dangereux) et, si tu le choisis dans Réglages → Isolation, un
+  `docker run --rm --network none` ou le binaire `opensandbox`. Aucune de
+  ces couches n'est un hypervisor : une confirmation humaine reste
+  obligatoire avant chaque commande.
 - **N'expose jamais HL Studio sur un réseau public.** Si tu dois l'héberger
   derrière un autre nom d'hôte, renseigne `HLSTUDIO_ALLOWED_HOSTS` *et* une clé
   `HL_AGENT_API_KEY`.
@@ -268,7 +275,10 @@ n'apporte rien. La vérification TypeScript, elle, reste dans le build.
 - La génération **d'images** passe par `/images/generations` (protocole OpenAI)
   ou `generateContent` (Gemini). Le protocole Anthropic ne produit pas
   d'images.
-- L'automatisation du navigateur (Playwright) n'est pas encore là.
+- L'automatisation du navigateur (Playwright) est **désactivée par défaut**.
+  Active-la dans Réglages → Isolation, puis installe Chromium une fois
+  (`npm i -D playwright` et `npx playwright install chromium`). Chaque
+  action demande encore une confirmation.
 - Le panneau Preview suppose qu'un serveur de développement tourne sur le port
   indiqué par `NEXT_PUBLIC_PREVIEW_URL` ; il ne le démarre pas lui-même.
 

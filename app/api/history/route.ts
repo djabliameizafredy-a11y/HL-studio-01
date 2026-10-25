@@ -5,6 +5,11 @@ import {
   getMessages,
   listConversations,
 } from "@/lib/db/conversations";
+import {
+  getAgentSession,
+  getLatestAgentSession,
+  listAgentSessions,
+} from "@/lib/db/agentSessions";
 import { errorResponse, jsonError } from "@/lib/api/respond";
 import { WORKSPACE_MODES, type WorkspaceMode } from "@/lib/types";
 
@@ -14,9 +19,10 @@ export const dynamic = "force-dynamic";
 /**
  * Historique d'un mode.
  * GET /api/history?mode=chat[&conversationId=...]
+ * GET /api/history?mode=code[&sessionId=...]
  *
- * Sans conversationId, renvoie la conversation la plus récemment active du
- * mode — ce que les panneaux chargent au montage.
+ * Sans identifiant, renvoie la conversation (ou la session Agent) la plus
+ * récemment active — ce que les panneaux chargent au montage.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -26,6 +32,26 @@ export async function GET(req: NextRequest) {
         400,
         `Paramètre 'mode' requis. Valeurs acceptées : ${WORKSPACE_MODES.join(", ")}.`
       );
+    }
+
+    if (mode === "code") {
+      const requested = req.nextUrl.searchParams.get("sessionId");
+      const session =
+        (requested && getAgentSession(requested)) || getLatestAgentSession();
+      return NextResponse.json({
+        session: session
+          ? {
+              id: session.id,
+              task: session.task,
+              modelUsed: session.modelUsed,
+              status: session.status,
+              steps: session.steps,
+              createdAt: session.createdAt,
+              updatedAt: session.updatedAt,
+            }
+          : null,
+        sessions: listAgentSessions(),
+      });
     }
 
     const requested = req.nextUrl.searchParams.get("conversationId");

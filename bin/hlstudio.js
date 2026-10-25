@@ -36,6 +36,10 @@ function relaunchWithSqliteFlag() {
 }
 
 // --- Parse args ---
+function hasFlag(name) {
+  return process.argv.includes(name);
+}
+
 function getPort() {
   // 1. --port flag
   const portArgIdx = process.argv.indexOf("--port");
@@ -71,6 +75,26 @@ function getWorkspace() {
 }
 
 async function main() {
+  if (hasFlag("--help") || hasFlag("-h")) {
+    console.log(`HL Studio — studio IA local-first (BYOK)
+
+Usage:
+  npx hlstudio [options]
+  node bin/hlstudio.js [options]
+
+Options:
+  --port <n>          Port du serveur (défaut : premier libre à partir de 3000)
+  --workspace <dir>   Dossier de travail de l'agent (défaut : ~/.hlstudio/workspace)
+  --no-open           N'ouvre pas le navigateur
+  --help, -h          Affiche cette aide
+
+Variables d'environnement (toutes optionnelles) :
+  HLSTUDIO_HOME, HLSTUDIO_WORKSPACE, HLSTUDIO_PORT,
+  HLSTUDIO_ALLOWED_HOSTS, HL_AGENT_API_KEY, GITHUB_TOKEN
+`);
+    process.exit(0);
+  }
+
   if (relaunchWithSqliteFlag()) {
     const { spawnSync } = await import("node:child_process");
     const result = spawnSync(
@@ -168,7 +192,9 @@ async function main() {
   console.log("");
 
   // --- Ouvrir le navigateur ---
-  if (openFn) {
+  if (hasFlag("--no-open")) {
+    console.log(`  ℹ️  Navigateur non ouvert (--no-open). Ouvre : ${url}`);
+  } else if (openFn) {
     try {
       await openFn(url);
       console.log("  🌐 Navigateur ouvert automatiquement.");
