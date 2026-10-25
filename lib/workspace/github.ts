@@ -69,7 +69,7 @@ export function parseGithubRemote(remote: string): GithubRepo | null {
   if (host.toLowerCase() !== "github.com") return null;
 
   const match = /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/.exec(
-    pathname.replace(/\.git$/, "")
+    pathname.replace(/\/+$/, "").replace(/\.git$/, "")
   );
   return match ? { owner: match[1], repo: match[2] } : null;
 }

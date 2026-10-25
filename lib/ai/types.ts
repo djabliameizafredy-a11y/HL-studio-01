@@ -44,13 +44,14 @@ export interface AiRequest {
  * quota dépassé (429) ou d'une panne du service (5xx).
  */
 export class ProviderError extends Error {
-  constructor(
-    message: string,
-    readonly status?: number,
-    readonly providerLabel?: string
-  ) {
+  readonly status?: number;
+  readonly providerLabel?: string;
+
+  constructor(message: string, status?: number, providerLabel?: string) {
     super(message);
     this.name = "ProviderError";
+    this.status = status;
+    this.providerLabel = providerLabel;
   }
 }
 
