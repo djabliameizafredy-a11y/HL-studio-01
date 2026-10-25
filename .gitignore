@@ -1,0 +1,29 @@
+node_modules/
+.next/
+out/
+npm-debug.log*
+.DS_Store
+
+# Logs d'installation et de build
+*.log
+!CHANGELOG.md
+
+# Secrets — jamais commités (les modèles *.example, eux, sont suivis)
+.env
+.env.*
+!.env.example
+config.json
+!config.example.json
+mcp.json
+!mcp.example.json
+hooks.json
+!hooks.example.json
+
+# Dossier de travail de l'agent à la RACINE uniquement.
+# (Avant : "workspace/" ignorait aussi app/api/workspace/, ce qui
+# excluait ces routes du dépôt.)
+/workspace/
+
+# Configs locales pouvant contenir des tokens
+.hlstudio/
+*.tsbuildinfo

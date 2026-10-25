@@ -1,0 +1,32 @@
+{
+  "_lisez_moi": [
+    "Modèle du fichier <workspace>/.hlstudio/mcp.json.",
+    "Un serveur MCP déclaré ici peut exécuter du code sur ta machine :",
+    "n'ajoute que des serveurs dont tu connais la provenance.",
+    "Les serveurs stdio n'héritent PAS de process.env : seules les variables",
+    "listées dans leur champ `env` leur sont transmises, donc tes clés IA",
+    "ne fuitent pas vers des serveurs tiers.",
+    "L'agent ne peut pas activer ce fichier lui-même : ses écritures atterrissent",
+    "dans mcp.json.proposed, que tu dois renommer à la main.",
+    "Aucun secret réel ne doit figurer dans un fichier commité."
+  ],
+  "servers": {
+    "filesystem": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/chemin/vers/un/dossier"]
+    },
+    "un-service-distant": {
+      "transport": "sse",
+      "url": "https://exemple.invalid/mcp/sse"
+    },
+    "serveur-avec-secret": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@exemple/serveur-mcp"],
+      "env": {
+        "SERVICE_API_KEY": "REMPLACE_PAR_TA_CLE"
+      }
+    }
+  }
+}

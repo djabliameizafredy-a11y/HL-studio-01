@@ -1,0 +1,36 @@
+{
+  "_lisez_moi": [
+    "Modèle du fichier <workspace>/.hlstudio/hooks.json.",
+    "Chaque hook est une commande shell exécutée automatiquement dans le",
+    "dossier de travail : traite ce fichier avec la même prudence qu'un script.",
+    "L'agent ne peut pas l'activer lui-même : ses écritures atterrissent dans",
+    "hooks.json.proposed, que tu dois renommer à la main.",
+    "Variables disponibles : $FILE_PATH (after_file_write), $COMMAND (before_command).",
+    "timeout est en millisecondes (défaut 10000).",
+    "blocking n'a d'effet que sur before_command : si le hook échoue,",
+    "la commande de l'agent est annulée."
+  ],
+  "after_file_write": [
+    {
+      "command": "npx prettier --write \"$FILE_PATH\"",
+      "timeout": 15000
+    }
+  ],
+  "before_command": [
+    {
+      "command": "echo \"$COMMAND\" >> .hlstudio/commandes.log",
+      "timeout": 2000,
+      "blocking": false
+    }
+  ],
+  "session_start": [
+    {
+      "command": "git status --short"
+    }
+  ],
+  "session_end": [
+    {
+      "command": "echo 'Session terminée'"
+    }
+  ]
+}

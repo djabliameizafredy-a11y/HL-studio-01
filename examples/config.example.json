@@ -1,0 +1,95 @@
+{
+  "_lisez_moi": [
+    "Modèle du fichier ~/.hlstudio/config.json.",
+    "Tu n'as PAS besoin de l'écrire à la main : l'écran Réglages le génère.",
+    "Il est donné ici pour comprendre la structure et pouvoir l'éditer.",
+    "Aucune clé réelle ne figure dans cet exemple — ne commit jamais le vrai fichier.",
+    "HL Studio le crée en permissions 0600 et ne renvoie jamais apiKey au navigateur."
+  ],
+  "version": 1,
+  "providers": [
+    {
+      "id": "prov_openai",
+      "label": "OpenAI",
+      "protocol": "openai",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKey": "REMPLACE_PAR_TA_CLE",
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "prov_anthropic",
+      "label": "Anthropic",
+      "protocol": "anthropic",
+      "baseUrl": "https://api.anthropic.com/v1",
+      "apiKey": "REMPLACE_PAR_TA_CLE",
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "prov_gemini",
+      "label": "Google Gemini",
+      "protocol": "gemini",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+      "apiKey": "REMPLACE_PAR_TA_CLE",
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "prov_ollama",
+      "label": "Ollama (local)",
+      "protocol": "openai",
+      "baseUrl": "http://localhost:11434/v1",
+      "apiKey": "ollama",
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    }
+  ],
+  "models": [
+    {
+      "id": "mdl_chat",
+      "providerId": "prov_openai",
+      "model": "nom-du-modele-texte",
+      "label": "Mon modèle de discussion",
+      "capabilities": ["text"],
+      "supportsTools": false,
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "mdl_code",
+      "providerId": "prov_anthropic",
+      "model": "nom-du-modele-code",
+      "label": "Mon modèle de code",
+      "capabilities": ["text", "code"],
+      "supportsTools": true,
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "mdl_image",
+      "providerId": "prov_gemini",
+      "model": "nom-du-modele-image",
+      "label": "Mon modèle d'images",
+      "capabilities": ["image"],
+      "supportsTools": false,
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "mdl_video",
+      "providerId": "prov_gemini",
+      "model": "nom-du-modele-video",
+      "label": "Mon modèle de vidéos",
+      "capabilities": ["video"],
+      "supportsTools": false,
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    }
+  ],
+  "assignments": {
+    "chat": "mdl_chat",
+    "code": "mdl_code",
+    "design": "mdl_image",
+    "video": "mdl_video"
+  },
+  "assistantModelId": "mdl_chat",
+  "preferences": {
+    "theme": "dark"
+  },
+  "integrations": {
+    "githubToken": ""
+  }
+}
