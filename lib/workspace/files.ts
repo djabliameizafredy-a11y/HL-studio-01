@@ -157,7 +157,11 @@ export async function extractZipBuffer(
   for (const entry of zip.getEntries()) {
     const entryPath = entry.entryName.replace(/\\/g, "/");
     if (entry.isDirectory) continue;
-    if (entryPath.includes("..") || path.isAbsolute(entryPath)) {
+
+    const normalized = entryPath.replace(/^\.\//, "").replace(/^\//, "");
+    const segments = normalized.split("/").filter(Boolean);
+    const hasTraversal = segments.some((segment) => segment === ".." || segment === ".");
+    if (hasTraversal || path.isAbsolute(entryPath) || normalized.startsWith("../")) {
       skipped.push(entryPath);
       continue;
     }
