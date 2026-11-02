@@ -117,9 +117,12 @@ export async function* parseSse(
       if (done) break;
 
       // Normaliser les fins de ligne simplifie la détection du séparateur.
-      // Un "\r\n" coupé entre deux paquets est recollé au tour suivant, le
-      // "\r" isolé restant en fin de tampon.
-      buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+      // Un "\r\n" ou "\r" coupé entre deux paquets est recollé au tour
+      // suivant ; la norme SSE ne tolère pas de "\r" persistant dans le
+      // payload d'un évènement.
+      buffer = (buffer + decoder.decode(value, { stream: true }))
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n");
 
       let separator: number;
       while ((separator = buffer.indexOf("\n\n")) !== -1) {
@@ -129,8 +132,11 @@ export async function* parseSse(
         let event: string | null = null;
         const dataLines: string[] = [];
         for (const line of block.split("\n")) {
-          if (line.startsWith("event:")) event = line.slice(6).trim();
-          else if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""));
+          const normalized = line.trimEnd();
+          if (normalized.startsWith("event:")) event = normalized.slice(6).trim();
+          else if (normalized.startsWith("data:")) {
+            dataLines.push(normalized.slice(5).replace(/^\s/, ""));
+          }
         }
         if (dataLines.length > 0) yield { event, data: dataLines.join("\n") };
       }
