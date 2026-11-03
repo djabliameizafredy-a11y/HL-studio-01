@@ -10,9 +10,10 @@ export const runtime = "nodejs";
  */
 export async function GET(
   _req: Request,
-  { params }: { params: { file: string } }
+  { params }: { params: Promise<{ file: string }> }
 ) {
-  const resolved = resolveMediaFile(params.file);
+  const { file } = await params;
+  const resolved = resolveMediaFile(file);
   if (!resolved) {
     return jsonError(400, "Nom de fichier média invalide.");
   }

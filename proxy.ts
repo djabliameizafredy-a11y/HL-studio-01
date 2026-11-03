@@ -50,7 +50,7 @@ function forbid(status: number, error: string) {
   });
 }
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const hostHeader = req.headers.get("host") ?? "";
 
   if (!allowedHosts().has(hostnameOf(hostHeader))) {
