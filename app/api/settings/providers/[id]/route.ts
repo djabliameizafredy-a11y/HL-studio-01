@@ -13,11 +13,12 @@ export const runtime = "nodejs";
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const body = await readJsonBody(req);
-    return NextResponse.json(updateProvider(params.id, body));
+    const { id } = await params;
+    return NextResponse.json(updateProvider(id, body));
   } catch (err) {
     return errorResponse(err, "api/settings/providers/[id]");
   }
@@ -30,10 +31,11 @@ export async function PATCH(
  */
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    deleteProvider(params.id);
+    const { id } = await params;
+    deleteProvider(id);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return errorResponse(err, "api/settings/providers/[id]");
